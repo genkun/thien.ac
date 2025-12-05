@@ -34,7 +34,7 @@ a {
    height: 70px;
    border-radius: 100%;
    position: absolute;
-   color: #ffffff;
+   
    transition: transform ease-out 200ms;
 }
 .menu-open {
@@ -50,7 +50,7 @@ a {
    margin-top: -1px;
    width: 35px;
    height: 4px;
-   background: #0000cc;
+   
    border-radius: 1em;
    transition: transform 200ms;
 }
@@ -87,7 +87,7 @@ a {
 }
 
 .menu-open-button {
-   background: #ffd700;
+  
    z-index: 2;
    transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
    transition-duration: 0.3s;
