@@ -18,17 +18,10 @@ svg {
 	cursor: pointer;
 	filter: sepia(20%);
 }
-* {
+{
    box-sizing: border-box;
 }
-body {
-   padding: 0;
-   margin: 0;
-   background: #ed9f9f;
-   min-height: 100vh;
-   display: grid;
-   place-items: center;
-}
+
 a {
    text-decoration: none;
 }
