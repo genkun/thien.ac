@@ -6,6 +6,32 @@
   <link rel="stylesheet" href="./style.css">
 
 </head>
+  <div class='content-wrapper'>
+   <div class='navmenu'>
+      <form action='/search' autocomplete='off' id='search-form' method='get'>
+         <input name='q' placeholder='Search here...' size='15' type='text'/>
+         <input id='button-submit' type='submit' value='Search'/>
+      </form>
+      <span id='menu'><img src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAC9JREFUeNpi/P//PwM1AQsQU9VEJgYqg8FvICgMGUeel0eTzWiyGU02Qz/ZAAQYAOPcBjEdYroKAAAAAElFTkSuQmCC'  /></span>
+      <nav id='navbar' itemprop='mainEntity' itemscope='itemscope' itemtype='https://schema.org/SiteNavigationElement'>
+         <ul class='navbar'>
+            <li><a href='#1' itemprop='url' title='Home'><span itemprop='name'>Home</span></a></li>
+            <li><a href='#2' itemprop='url' title='Home'><span itemprop='name'>News</span></a></li>
+            <li><a href='#3' itemprop='url' title='Home'><span itemprop='name'>Blog</span></a></li>
+            <li id='sub-menu'>
+               <span itemprop='name'>Courses</span>
+               <ul class="sub-menu">
+                  <li><a href='#4' itemprop='url' title='Home'><span itemprop='name'>HTML</span></a></li>
+                  <li><a href='#5' itemprop='url' title='Home'><span itemprop='name'>CSS</span></a></li>
+                  <li><a href='#6' itemprop='url' title='Home'><span itemprop='name'>JavaScript</span></a></li>
+               </ul>
+            </li>
+            <li><a href='#7' itemprop='url' title='Home'><span itemprop='name'>Contact Us</span></a></li>
+         </ul>
+      </nav>
+   </div>
+</div>
+<div style='clear: both;'/>
 <body>
 <!-- partial:index.partial.html -->
 <!DOCTYPE html>
