@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chuyển số → chữ (VNĐ)</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;margin:24px;background:#f7f9fc;color:#0b1220}
+    .card{max-width:800px;margin:0 auto;background:#fff;border-radius:12px;padding:20px;box-shadow:0 6px 20px rgba(10,20,40,0.06)}
+    h1{font-size:20px;margin:0 0 12px}
+    label{display:block;margin-top:12px;font-weight:600}
+    input[type=number],input[type=text],textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #e2e8f0;font-size:16px}
+    .row{display:flex;gap:8px;margin-top:12px}
+    button{padding:10px 14px;border-radius:8px;border:0;background:#2563eb;color:white;font-weight:600;cursor:pointer}
+    button.secondary{background:#6b7280}
+    pre{white-space:pre-wrap;background:#f1f5f9;padding:12px;border-radius:8px;border:1px dashed #e6eef8}
+    .note{font-size:13px;color:#475569;margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Chuyển số sang chữ (Việt Nam đồng)</h1>
+    <p class="note">Dán số (không cần phân cách thousands) hoặc dùng nút "Định dạng". Hỗ trợ số âm và số tới hàng tỷ (và hơn).
+    </p>
+
+    <label for="num">Số / Số tiền (VD: 1250000)</label>
+    <input id="num" type="text" inputmode="numeric" pattern="[0-9,.-]*" placeholder="Nhập số (ví dụ: 123456789)" />
+
+    <div class="row">
+      <button id="convert">Chuyển thành chữ</button>
+      <button id="format" class="secondary">Định dạng hiển thị</button>
+      <button id="copy" class="secondary">Sao chép chữ</button>
+      <button id="clear" class="secondary">Xóa</button>
+    </div>
+
+    <label>Kết quả</label>
+    <pre id="result">—</pre>
+
+    <label>Phiên bản rút gọn (dùng cho hóa đơn)</label>
+    <input id="short" type="text" readonly />
+
+    <p class="note">Quy tắc đọc tiếng Việt được áp dụng: 21 = "hai mươi mốt", 15 = "mười lăm", 104 = "một trăm linh tư" (tùy ngữ cảnh). Kết quả kết thúc bằng chữ "đồng".</p>
+  </div>
+
+  <script>
+    // Chức năng chuyển số thành chữ tiếng Việt (cho tiền VNĐ)
+    const ONES = ['không','một','hai','ba','bốn','năm','sáu','bảy','tám','chín'];
+    const UNITS = ['','nghìn','triệu','tỷ','nghìn tỷ','triệu tỷ','tỷ tỷ'];
+
+    function readTriple(num){ // num: 0..999
+      const hundred = Math.floor(num/100);
+      const ten = Math.floor((num%100)/10);
+      const unit = num%10;
+      let parts = [];
+      if(hundred>0){ parts.push(ONES[hundred] + ' trăm'); }
+      if(ten>1){ // 20..99
+        parts.push(ONES[ten] + ' mươi');
+        if(unit===1) parts.push('mốt');
+        else if(unit===4) parts.push('tư');
+        else if(unit===5) parts.push('lăm');
+        else if(unit>0) parts.push(ONES[unit]);
+      } else if(ten===1){ // 10..19
+        parts.push('mười');
+        if(unit===0){}
+        else if(unit===5) parts.push('lăm');
+        else parts.push(ONES[unit]);
+      } else { // ten === 0
+        if(unit>0){
+          if(hundred>0) parts.push('lẻ'); // ví dụ 104 -> "một trăm lẻ bốn"
+          if(unit===5 && hundred>0) parts.push('lăm');
+          else parts.push(ONES[unit]);
+        }
+      }
+      return parts.join(' ');
+    }
+
+    function numberToVietnameseWords(input){
+      if(input===null || input==='') return '';
+      // normalize: remove commas, spaces
+      let s = String(input).replace(/[^0-9\-\.]/g,'');
+      if(s==='') return '';
+      const negative = s.startsWith('-');
+      if(negative) s = s.slice(1);
+      // We will ignore decimals for VNĐ (but if present, read 2 decimals as xu)
+      let decimalPart = '';
+      if(s.indexOf('.')>=0){
+        const parts = s.split('.');
+        s = parts[0];
+        decimalPart = parts[1].slice(0,2); // at most 2 digits
+      }
+      // strip leading zeros
+      s = s.replace(/^0+(?!$)/, '');
+      if(s.length>21){
+        return 'Số quá lớn (hỗ trợ tối đa 21 chữ số).';
+      }
+      if(s==='0') return 'Không đồng';
+      // split in groups of 3 from right
+      const groups = [];
+      for(let i=s.length; i>0; i-=3){
+        const start = Math.max(0, i-3);
+        groups.push(parseInt(s.slice(start,i),10));
+      }
+      let words = [];
+      for(let i=groups.length-1;i>=0;i--){
+        const g = groups[i];
+        if(g===0){
+          // if middle zeros but later groups nonzero, may need to add unit name for clarity
+          // do nothing here, but ensure we insert unit if any higher group exists and later has value
+          // handled below
+        } else {
+          const r = readTriple(g);
+          const unit = UNITS[i] || '';
+          words.push(r + (unit? ' ' + unit : ''));
+        }
+      }
+      // Special handling: when groups have zeros between non-zero groups, we may need to insert 'không trăm lẻ'
+      // Simpler approach: rebuild by iterating groups left-to-right preserving zeros when necessary
+      // Rebuild fully correctly:
+      const fullWords = [];
+      for(let i=groups.length-1;i>=0;i--){
+        const g = groups[i];
+        const unitName = UNITS[i] || '';
+        if(g===0){
+          // if there is any non-zero group to the right and we've already added something, we should add nothing (skip)
+          // but if groups to left exist and next non-zero group exists, we may need to insert a placeholder 'không' group? For money reading, usually skip.
+        } else {
+          const triple = readTriple(g);
+          fullWords.push(triple + (unitName? ' ' + unitName: ''));
+        }
+      }
+
+      let result = fullWords.join(' ');
+      // cleanup spacing
+      result = result.replace(/\s+/g,' ').trim();
+      if(negative) result = 'Âm ' + result;
+      // Capitalize first letter
+      result = result.charAt(0).toUpperCase() + result.slice(1) + ' đồng';
+      if(decimalPart){
+        // read decimal (as xu)
+        const decNum = parseInt(decimalPart,10);
+        if(!isNaN(decNum) && decNum>0){
+          const decWords = numberToVietnameseWords(decNum.toString()).replace(/ đồng$/,'');
+          result += ' ' + decWords + ' xu';
+        }
+      }
+      return result;
+    }
+
+    // Helpers for UI
+    const numInput = document.getElementById('num');
+    const resultEl = document.getElementById('result');
+    const shortEl = document.getElementById('short');
+    document.getElementById('convert').addEventListener('click', ()=>{
+      const v = numInput.value.trim();
+      if(v==='') { resultEl.textContent = 'Vui lòng nhập một số.'; shortEl.value = ''; return; }
+      const normalized = v.replace(/,/g,'').replace(/\s+/g,'');
+      const words = numberToVietnameseWords(normalized);
+      resultEl.textContent = words;
+      // short version: capitalize first letter and remove " đồng" for short field? We'll keep full short
+      shortEl.value = words;
+    });
+
+    document.getElementById('format').addEventListener('click', ()=>{
+      // format with thousand separators
+      let v = numInput.value.trim();
+      if(v==='') return;
+      const neg = v.trim().startsWith('-');
+      v = v.replace(/[^0-9\.]/g,'');
+      const parts = v.split('.');
+      let intPart = parts[0].replace(/^0+(?!$)/,'');
+      if(intPart==='') intPart = '0';
+      intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      numInput.value = (neg?'-':'') + intPart + (parts[1]?'.'+parts[1]:'');
+    });
+
+    document.getElementById('clear').addEventListener('click', ()=>{
+      numInput.value=''; resultEl.textContent='—'; shortEl.value='';
+    });
+
+    document.getElementById('copy').addEventListener('click', ()=>{
+      const text = resultEl.textContent || '';
+      if(!text || text==='—') return alert('Không có kết quả để sao chép');
+      navigator.clipboard.writeText(text).then(()=>{
+        alert('Đã sao chép');
+      }).catch(()=>{ alert('Trình duyệt không hỗ trợ sao chép tự động. Vui lòng sao chép thủ công.'); });
+    });
+
+    // allow enter to convert
+    numInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') document.getElementById('convert').click(); });
+  </script>
+</body>
+</html>
