@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Web tiện ích văn phòng</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#111827; --card:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --accent:#38bdf8; --danger:#ef4444; --ok:#22c55e; }
+    *{ box-sizing:border-box }
+    body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:linear-gradient(180deg,#0b1023,#0f172a 30%,#0f172a); color:var(--text); }
+    header{ position:sticky; top:0; backdrop-filter:saturate(1.2) blur(6px); background:rgba(17,24,39,.8); border-bottom:1px solid #24303f; z-index:10 }
+    .wrap{ max-width:1100px; margin:0 auto; padding:16px }
+    h1{ margin:8px 0 6px; font-size:22px }
+    nav{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 12px }
+    nav button{ background:var(--card); color:var(--text); border:1px solid #2b3647; padding:8px 12px; border-radius:10px; cursor:pointer; }
+    nav button.active{ border-color:var(--accent); box-shadow:0 0 0 2px rgba(56,189,248,.15); }
+    .grid{ display:grid; grid-template-columns:repeat(12,1fr); gap:14px }
+    .card{ grid-column:span 12; background:var(--card); border:1px solid #2b3647; border-radius:14px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.25) }
+    @media(min-width:780px){
+      .card.half{ grid-column:span 6 }
+      .card.third{ grid-column:span 4 }
+    }
+    .card h2{ font-size:18px; margin:4px 0 10px; color:#cfe9ff }
+    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+    input, select, textarea{ width:100%; background:#0f172a; color:var(--text); border:1px solid #2b3647; border-radius:10px; padding:8px 10px; }
+    textarea{ min-height:120px; resize:vertical }
+    .btn{ background:#0f172a; border:1px solid #2b3647; color:var(--text); padding:8px 12px; border-radius:10px; cursor:pointer }
+    .btn.primary{ border-color:var(--accent) }
+    .btn.ok{ border-color:var(--ok) }
+    .btn.danger{ border-color:var(--danger); color:#fecaca }
+    .list{ margin-top:8px; display:flex; flex-direction:column; gap:8px }
+    .item{ display:flex; gap:8px; align-items:center; justify-content:space-between; background:#0f172a; border:1px solid #2b3647; border-radius:10px; padding:8px 10px }
+    .item .left{ display:flex; gap:10px; align-items:center; }
+    .muted{ color:var(--muted); font-size:12px }
+    .badge{ font-size:12px; padding:2px 8px; border:1px solid #2b3647; border-radius:999px; color:#cfe9ff }
+    .footer{ text-align:center; color:var(--muted); padding:20px 0 }
+    .timer{ font-size:28px; letter-spacing:1px; }
+    .stack{ display:flex; flex-direction:column; gap:8px }
+    .split{ display:grid; grid-template-columns:1fr 1fr; gap:8px }
+    .hint{ font-size:12px; color:#9fb2c8 }
+    .kbd{ background:#0b1023; border:1px solid #2b3647; border-radius:6px; padding:1px 6px; font-size:12px }
+    .success{ color:#86efac }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Web tiện ích văn phòng</h1>
+      <div class="muted">Gọn nhẹ, chạy trên trình duyệt. Dữ liệu lưu cục bộ (LocalStorage).</div>
+      <nav id="tabs"></nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="content"></section>
+    <div class="footer">© 2025 – Tiện ích cơ bản: To-do, Ghi chú, Đếm từ, Đổi chữ, Máy tính, Đồng hồ/Pomodoro, Chuyển đổi đơn vị.</div>
+  </main>
+
+  <script>
+    // State & utilities
+    const S = {
+      todos: JSON.parse(localStorage.getItem('todos_v1')||'[]'),
+      notes: localStorage.getItem('notes_v1')||'',
+      activeTab: localStorage.getItem('active_tab')||'todo',
+      pomodoro: { secs: 25*60, running:false, mode:'focus' }
+    };
+    const save = () => {
+      localStorage.setItem('todos_v1', JSON.stringify(S.todos));
+      localStorage.setItem('notes_v1', S.notes);
+      localStorage.setItem('active_tab', S.activeTab);
+    };
+    const el = (html) => {
+      const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild;
+    };
+    const fmtTime = (s) => {
+      const m = Math.floor(s/60), ss = s%60;
+      return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    };
+
+    // Tabs
+    const TABS = [
+      { id:'todo', label:'To-do list' },
+      { id:'notes', label:'Ghi chú nhanh' },
+      { id:'words', label:'Đếm từ & ký tự' },
+      { id:'case', label:'Đổi chữ hoa–thường' },
+      { id:'calc', label:'Máy tính' },
+      { id:'time', label:'Đồng hồ & Pomodoro' },
+      { id:'convert', label:'Chuyển đổi đơn vị' },
+    ];
+
+    const tabsEl = document.getElementById('tabs');
+    const contentEl = document.getElementById('content');
+
+    function renderTabs(){
+      tabsEl.innerHTML = '';
+      TABS.forEach(t => {
+        const b = el(`<button class="${S.activeTab===t.id?'active':''}">${t.label}</button>`);
+        b.onclick = () => { S.activeTab = t.id; save(); render(); };
+        tabsEl.appendChild(b);
+      });
+    }
+
+    // Views
+    function viewTodo(){
+      const root = el(`<div class="grid">
+        <div class="card">
+          <h2>To-do list</h2>
+          <div class="row">
+            <input id="todoInput" placeholder="Nhập việc cần làm... (Enter để thêm)"/>
+            <button class="btn primary" id="addBtn">Thêm</button>
+            <button class="btn danger" id="clearBtn">Xóa việc đã hoàn thành</button>
+          </div>
+          <div class="list" id="todoList"></div>
+          <div class="muted">Mẹo: Nhấn <span class="kbd">Enter</span> để thêm nhanh. Kéo thả sắp xếp (giữ lâu để kéo).</div>
+        </div>
+      </div>`);
+      // List render
+      const listEl = root.querySelector('#todoList');
+      function draw(){
+        listEl.innerHTML = '';
+        S.todos.forEach((it, idx) => {
+          const item = el(`<div class="item" draggable="true">
+            <div class="left">
+              <input type="checkbox" ${it.done?'checked':''}/>
+              <span>${it.text}</span>
+            </div>
+            <div class="row">
+              <span class="badge">${it.done?'Đã xong':'Đang làm'}</span>
+              <button class="btn danger">Xóa</button>
+            </div>
+          </div>`);
+          const cb = item.querySelector('input[type=checkbox]');
+          cb.onchange = () => { it.done = cb.checked; save(); draw(); };
+          item.querySelector('.btn.danger').onclick = () => { S.todos.splice(idx,1); save(); draw(); };
+          // Drag reorder
+          item.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', idx); });
+          item.addEventListener('dragover', e => e.preventDefault());
+          item.addEventListener('drop', e => {
+            e.preventDefault();
+            const from = +e.dataTransfer.getData('text/plain');
+            const to = idx;
+            if(from===to) return;
+            const [moved] = S.todos.splice(from,1);
+            S.todos.splice(to,0,moved);
+            save(); draw();
+          });
+          listEl.appendChild(item);
+        });
+      }
+      draw();
+
+      const input = root.querySelector('#todoInput');
+      const add = () => {
+        const v = (input.value||'').trim();
+        if(!v) return;
+        S.todos.push({ text:v, done:false });
+        input.value = ''; save(); draw();
+      };
+      root.querySelector('#addBtn').onclick = add;
+      input.addEventListener('keydown', e => { if(e.key==='Enter') add(); });
+
+      root.querySelector('#clearBtn').onclick = () => {
+        S.todos = S.todos.filter(x=>!x.done); save(); draw();
+      };
+
+      return root;
+    }
+
+    function viewNotes(){
+      const root = el(`<div class="grid">
+        <div class="card">
+          <h2>Ghi chú nhanh</h2>
+          <div class="stack">
+            <textarea id="notesBox" placeholder="Ghi nhanh ý tưởng, biên bản, checklist..."></textarea>
+            <div class="row">
+              <button class="btn ok" id="saveNotes">Lưu</button>
+              <span class="muted">Tự động lưu khi gõ. Dữ liệu nằm trên máy bạn.</span>
+            </div>
+          </div>
+        </div>
+      </div>`);
+      const box = root.querySelector('#notesBox');
+      box.value = S.notes||'';
+      box.addEventListener('input', () => { S.notes = box.value; save(); });
+      root.querySelector('#saveNotes').onclick = () => { save(); box.blur(); };
+      return root;
+    }
+
+    function viewWords(){
+      const root = el(`<div class="grid">
+        <div class="card half">
+          <h2>Đếm từ & ký tự</h2>
+          <textarea id="textCount" placeholder="Dán nội dung cần đếm..."></textarea>
+          <div class="row">
+            <span class="badge" id="chars">Ký tự: 0</span>
+            <span class="badge" id="words">Từ: 0</span>
+            <span class="badge" id="lines">Dòng: 0</span>
+          </div>
+        </div>
+        <div class="card half">
+          <h2>Tách dòng trùng & làm sạch</h2>
+          <textarea id="cleanBox" placeholder="Dán danh sách..."></textarea>
+          <div class="row">
+            <button class="btn" id="trimBtn">Xóa khoảng trắng</button>
+            <button class="btn" id="dedupBtn">Loại trùng</button>
+            <button class="btn danger" id="clearBtn">Xóa hết</button>
+          </div>
+          <div class="hint">Mẹo: Hữu ích khi xử lý email, mã số, danh sách tên.</div>
+        </div>
+      </div>`);
+      const text = root.querySelector('#textCount');
+      const chars = root.querySelector('#chars');
+      const words = root.querySelector('#words');
+      const lines = root.querySelector('#lines');
+
+      const count = () => {
+        const t = text.value;
+        const w = t.trim() ? t.trim().split(/\s+/).length : 0;
+        const l = t ? t.split(/\r?\n/).length : 0;
+        chars.textContent = `Ký tự: ${t.length}`;
+        words.textContent = `Từ: ${w}`;
+        lines.textContent = `Dòng: ${l}`;
+      };
+      text.addEventListener('input', count); count();
+
+      const cleanBox = root.querySelector('#cleanBox');
+      root.querySelector('#trimBtn').onclick = () => {
+        cleanBox.value = cleanBox.value.split(/\r?\n/).map(s=>s.trim()).join('\n');
+      };
+      root.querySelector('#dedupBtn').onclick = () => {
+        const lines = cleanBox.value.split(/\r?\n/).map(s=>s.trim()).filter(s=>s.length);
+        const uniq = [...new Set(lines)];
+        cleanBox.value = uniq.join('\n');
+      };
+      root.querySelector('#clearBtn').onclick = () => { cleanBox.value = ''; };
+
+      return root;
+    }
+
+    function viewCase(){
+      const root = el(`<div class="grid">
+        <div class="card half">
+          <h2>Đổi chữ hoa–thường</h2>
+          <textarea id="caseIn" placeholder="Nhập nội dung..."></textarea>
+          <div class="row">
+            <button class="btn" data-act="upper">UPPERCASE</button>
+            <button class="btn" data-act="lower">lowercase</button>
+            <button class="btn" data-act="title">Title Case</button>
+            <button class="btn" data-act="sentence">Sentence case</button>
+            <button class="btn" data-act="slug">slug-case</button>
+          </div>
+        </div>
+        <div class="card half">
+          <h2>Kết quả</h2>
+          <textarea id="caseOut" placeholder="Kết quả sẽ hiện ở đây..."></textarea>
+          <div class="row">
+            <button class="btn ok" id="copyBtn">Sao chép</button>
+          </div>
+        </div>
+      </div>`);
+      const inp = root.querySelector('#caseIn');
+      const out = root.querySelector('#caseOut');
+      const mapTitle = s => s.toLowerCase().replace(/\w\S*/g, w=>w[0].toUpperCase()+w.slice(1));
+      const sentence = s => {
+        const a = s.toLowerCase().split(/([.!?]\s+)/);
+        return a.map((seg,i)=> i%2===0 ? seg.replace(/^\s*\w/, c=>c.toUpperCase()) : seg ).join('');
+      };
+      const slug = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+      root.querySelectorAll('button[data-act]').forEach(b=>{
+        b.onclick = () => {
+          const act = b.dataset.act, t = inp.value||'';
+          out.value = ({
+            upper: t.toUpperCase(),
+            lower: t.toLowerCase(),
+            title: mapTitle(t),
+            sentence: sentence(t),
+            slug: slug(t)
+          })[act];
+        };
+      });
+      root.querySelector('#copyBtn').onclick = async () => {
+        try { await navigator.clipboard.writeText(out.value||''); bFlash('Đã sao chép'); } catch{}
+      };
+      return root;
+    }
+
+    function viewCalc(){
+      const root = el(`<div class="grid">
+        <div class="card half">
+          <h2>Máy tính nhanh</h2>
+          <div class="stack">
+            <input id="expr" placeholder="Nhập phép tính (ví dụ: (12+5)*3/2)"/>
+            <div class="row">
+              <button class="btn ok" id="evalBtn">Tính</button>
+              <span class="muted">Hỗ trợ + - * / ( ) và số thập phân.</span>
+            </div>
+          </div>
+        </div>
+        <div class="card half">
+          <h2>Kết quả</h2>
+          <div id="result" class="badge">—</div>
+          <div id="err" class="muted"></div>
+        </div>
+      </div>`);
+      const expr = root.querySelector('#expr');
+      const result = root.querySelector('#result');
+      const err = root.querySelector('#err');
+      const safeEval = (s) => {
+        if(!/^[\d\s+*\-\/().]+$/.test(s)) throw new Error('Biểu thức không hợp lệ');
+        // eslint-disable-next-line no-new-func
+        return Function(`"use strict"; return (${s})`)();
+      };
+      const compute = () => {
+        try {
+          err.textContent = '';
+          const v = safeEval(expr.value.trim());
+          result.textContent = String(v);
+        } catch(e){
+          err.textContent = e.message || 'Lỗi tính toán';
+          result.textContent = '—';
+        }
+      };
+      root.querySelector('#evalBtn').onclick = compute;
+      expr.addEventListener('keydown', e => { if(e.key==='Enter') compute(); });
+      return root;
+    }
+
+    function viewTime(){
+      const root = el(`<div class="grid">
+        <div class="card half">
+          <h2>Đồng hồ thời gian thực</h2>
+          <div class="timer" id="clock">--:--:--</div>
+          <div class="muted" id="date">—</div>
+        </div>
+        <div class="card half">
+          <h2>Pomodoro</h2>
+          <div class="row">
+            <span class="badge" id="mode">Chế độ: Tập trung (25')</span>
+            <span class="badge" id="left">Còn: 25:00</span>
+          </div>
+          <div class="row">
+            <button class="btn ok" id="startPom">Bắt đầu</button>
+            <button class="btn" id="pausePom">Tạm dừng</button>
+            <button class="btn danger" id="resetPom">Reset</button>
+          </div>
+          <div class="row">
+            <select id="durSel">
+              <option value="25">Tập trung 25'</option>
+              <option value="15">Tập trung 15'</option>
+              <option value="5">Nghỉ 5'</option>
+              <option value="10">Nghỉ 10'</option>
+            </select>
+            <button class="btn" id="toggleMode">Đổi chế độ</button>
+          </div>
+          <div class="hint">Mẹo: Dùng chu kỳ 25'/5' để tối ưu năng suất.</div>
+        </div>
+      </div>`);
+      // Clock
+      const clock = root.querySelector('#clock');
+      const dateEl = root.querySelector('#date');
+      function tickClock(){
+        const d = new Date();
+        clock.textContent = d.toLocaleTimeString('vi-VN');
+        dateEl.textContent = d.toLocaleDateString('vi-VN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+      }
+      setInterval(tickClock, 1000); tickClock();
+
+      // Pomodoro
+      const left = root.querySelector('#left');
+      const mode = root.querySelector('#mode');
+      const durSel = root.querySelector('#durSel');
+      const start = root.querySelector('#startPom');
+      const pause = root.querySelector('#pausePom');
+      const reset = root.querySelector('#resetPom');
+      const toggle = root.querySelector('#toggleMode');
+
+      let timerId = null;
+      const updatePom = () => {
+        left.textContent = `Còn: ${fmtTime(S.pomodoro.secs)}`;
+        mode.textContent = `Chế độ: ${S.pomodoro.mode==='focus'?'Tập trung':'Nghỉ'} (${Math.round(S.pomodoro.secs/60)}')`;
+      };
+      updatePom();
+
+      const startPom = () => {
+        if(S.pomodoro.running) return;
+        S.pomodoro.running = true;
+        timerId = setInterval(() => {
+          if(S.pomodoro.secs>0){ S.pomodoro.secs--; updatePom(); }
+          else {
+            clearInterval(timerId); S.pomodoro.running=false;
+            bFlash('Hết phiên! Nghỉ ngơi nào.');
+          }
+        }, 1000);
+      };
+      const pausePom = () => { S.pomodoro.running=false; clearInterval(timerId); };
+      const resetPom = () => {
+        const mins = +durSel.value;
+        S.pomodoro.secs = Math.max(1, mins*60); S.pomodoro.running=false;
+        clearInterval(timerId); updatePom();
+      };
+      const toggleMode = () => {
+        S.pomodoro.mode = S.pomodoro.mode==='focus'?'break':'focus';
+        durSel.value = S.pomodoro.mode==='focus' ? '25' : '5';
+        resetPom();
+      };
+
+      start.onclick = startPom;
+      pause.onclick = pausePom;
+      reset.onclick = resetPom;
+      toggle.onclick = toggleMode;
+      durSel.onchange = resetPom;
+
+      return root;
+    }
+
+    function viewConvert(){
+      const root = el(`<div class="grid">
+        <div class="card half">
+          <h2>Độ dài</h2>
+          <div class="split">
+            <div class="stack">
+              <input id="m" placeholder="Met (m)"/>
+              <div class="muted">m ➜ km, ft, in</div>
+            </div>
+            <div class="stack">
+              <div class="badge" id="km">0 km</div>
+              <div class="badge" id="ft">0 ft</div>
+              <div class="badge" id="inch">0 in</div>
+            </div>
+          </div>
+        </div>
+        <div class="card half">
+          <h2>Trọng lượng</h2>
+          <div class="split">
+            <div class="stack">
+              <input id="kg" placeholder="Kilôgam (kg)"/>
+              <div class="muted">kg ➜ g, lb</div>
+            </div>
+            <div class="stack">
+              <div class="badge" id="g">0 g</div>
+              <div class="badge" id="lb">0 lb</div>
+            </div>
+          </div>
+        </div>
+        <div class="card third">
+          <h2>Nhiệt độ</h2>
+          <div class="stack">
+            <input id="c" placeholder="Celsius (°C)"/>
+            <div class="row">
+              <div class="badge" id="f">0 °F</div>
+              <div class="badge" id="k">0 K</div>
+            </div>
+          </div>
+        </div>
+        <div class="card third">
+          <h2>Tiền tố</h2>
+          <div class="stack">
+            <input id="num" placeholder="Số"/>
+            <select id="prefixSel">
+              <option value="k">kilo (10³)</option>
+              <option value="M">mega (10⁶)</option>
+              <option value="G">giga (10⁹)</option>
+              <option value="m">milli (10⁻³)</option>
+              <option value="μ">micro (10⁻⁶)</option>
+              <option value="n">nano (10⁻⁹)</option>
+            </select>
+            <div class="badge" id="prefOut">—</div>
+          </div>
+        </div>
+        <div class="card third">
+          <h2>Phân tích ngày</h2>
+          <div class="stack">
+            <input id="dateIn" type="date"/>
+            <div class="badge" id="weekday">—</div>
+          </div>
+        </div>
+      </div>`);
+      const m = root.querySelector('#m'), km = root.querySelector('#km'), ft = root.querySelector('#ft'), inch = root.querySelector('#inch');
+      const kg = root.querySelector('#kg'), g = root.querySelector('#g'), lb = root.querySelector('#lb');
+      const c = root.querySelector('#c'), f = root.querySelector('#f'), k = root.querySelector('#k');
+      const num = root.querySelector('#num'), prefixSel = root.querySelector('#prefixSel'), prefOut = root.querySelector('#prefOut');
+      const dateIn = root.querySelector('#dateIn'), weekday = root.querySelector('#weekday');
+
+      m.oninput = () => {
+        const v = parseFloat(m.value); if(isNaN(v)){ km.textContent='0 km'; ft.textContent='0 ft'; inch.textContent='0 in'; return; }
+        km.textContent = `${(v/1000).toFixed(4)} km`;
+        ft.textContent = `${(v*3.2808399).toFixed(4)} ft`;
+        inch.textContent = `${(v*39.3700787).toFixed(4)} in`;
+      };
+      kg.oninput = () => {
+        const v = parseFloat(kg.value); if(isNaN(v)){ g.textContent='0 g'; lb.textContent='0 lb'; return; }
+        g.textContent = `${(v*1000).toFixed(2)} g`;
+        lb.textContent = `${(v*2.2046226218).toFixed(4)} lb`;
+      };
+      c.oninput = () => {
+        const v = parseFloat(c.value); if(isNaN(v)){ f.textContent='0 °F'; k.textContent='0 K'; return; }
+        f.textContent = `${(v*9/5+32).toFixed(2)} °F`;
+        k.textContent = `${(v+273.15).toFixed(2)} K`;
+      };
+      const prefixMap = { k:1e3, M:1e6, G:1e9, m:1e-3, 'μ':1e-6, n:1e-9 };
+      const updatePref = () => {
+        const v = parseFloat(num.value); const p = prefixSel.value; if(isNaN(v)){ prefOut.textContent='—'; return; }
+        prefOut.textContent = `${v} × ${p} = ${(v*prefixMap[p]).toPrecision(6)}`;
+      };
+      num.oninput = updatePref; prefixSel.onchange = updatePref;
+
+      dateIn.onchange = () => {
+        const d = new Date(dateIn.value);
+        if(isNaN(d.getTime())){ weekday.textContent = '—'; return; }
+        weekday.textContent = d.toLocaleDateString('vi-VN', { weekday:'long' });
+      };
+
+      return root;
+    }
+
+    // Toast
+    let toastId = null;
+    function bFlash(msg){
+      if(toastId) clearTimeout(toastId);
+      let t = document.getElementById('toast');
+      if(!t){
+        t = el(`<div id="toast" style="position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0b1023;border:1px solid #2b3647;color:#cfe9ff;padding:10px 14px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);z-index:999">${msg}</div>`);
+        document.body.appendChild(t);
+      } else { t.textContent = msg; }
+      t.style.opacity = 1;
+      toastId = setTimeout(()=>{ t.style.opacity = 0; }, 2000);
+    }
+
+    // Render
+    function render(){
+      renderTabs();
+      contentEl.innerHTML = '';
+      const map = {
+        todo:viewTodo,
+        notes:viewNotes,
+        words:viewWords,
+        case:viewCase,
+        calc:viewCalc,
+        time:viewTime,
+        convert:viewConvert,
+      };
+      contentEl.appendChild(map[S.activeTab]());
+      // highlight active tab
+      [...tabsEl.children].forEach((b,i)=>{ b.classList.toggle('active', TABS[i].id===S.activeTab); });
+    }
+    render();
+  </script>
+</body>
+</html>

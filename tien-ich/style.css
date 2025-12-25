@@ -1,0 +1,47 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
+  margin: 0;
+}
+header, footer {
+  background: #111827;
+  padding: 10px;
+  text-align: center;
+}
+nav button {
+  margin: 5px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #2b3647;
+  background: #1f2937;
+  color: #fff;
+  cursor: pointer;
+}
+nav button.active {
+  border-color: #38bdf8;
+}
+.card {
+  background: #1f2937;
+  margin: 10px;
+  padding: 15px;
+  border-radius: 10px;
+}
+textarea, input {
+  width: 100%;
+  margin: 5px 0;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #2b3647;
+  background: #0f172a;
+  color: #fff;
+}
+button {
+  margin: 5px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #2b3647;
+  background: #0f172a;
+  color: #fff;
+  cursor: pointer;
+}
